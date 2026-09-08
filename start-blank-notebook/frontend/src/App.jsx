@@ -14,6 +14,9 @@ function App() {
 
   // Save a new note to localStorage
   const saveNote = () => {
+    if (content.trim() === "") {
+      return;
+    }
     const newNote = {
       id: Date.now(),
       content: content,

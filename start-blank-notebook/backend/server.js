@@ -1,8 +1,11 @@
 const express = require("express");
+require('dotenv').config(); //import to be able to hide password in a file that isn't in git
+console.log(typeof process.env.DB_PASSWORD);
+
 const { Pool } = require("pg");
 const cors = require("cors");
-const bcrypt = require("bcrypt");
-const session = require("express-session");
+const bcrypt = require("bcrypt"); //hashes passwords
+const session = require("express-session"); //remembers whos signed in for more than 1 question
 
 const app = express();
 const port = 3000;
