@@ -64,7 +64,8 @@ function App() {
       // 2. Save unsent localStorage notes to psql
       for (const note of cachedNotes) {
         if (!note.savedToPostgres) {
-          await fetch("http://localhost:3000/api/notes", {
+
+          const response = await fetch("http://localhost:3000/api/notes", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -80,6 +81,7 @@ function App() {
             console.error("Save failed:", data);
             return;
           }
+
           note.savedToPostgres = true;
         }
       }
@@ -147,6 +149,20 @@ function App() {
 
       setIsLoggedIn(true);
       setMessage("Logged in!");
+
+      // Load PostgreSQL notes from username
+      const notesResponse = await fetch("http://localhost:3000/api/notes", {
+        credentials: "include",
+      });
+
+      if (notesResponse.ok) {
+        const postgresNotes = await notesResponse.json();
+
+        setNotes((currentNotes) => [
+          ...postgresNotes,
+          ...currentNotes,
+        ]);
+      }
     } catch (error) {
       console.error(error);
       setMessage("Error connecting to server for log in");
