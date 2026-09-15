@@ -148,7 +148,7 @@ function App() {
       }
 
       setIsLoggedIn(true);
-      setMessage("Logged in!");
+      setMessage(`Logged in as ${data.user.username}!`);
 
       // Load PostgreSQL notes from username
       const notesResponse = await fetch("http://localhost:3000/api/notes", {
@@ -232,7 +232,8 @@ function App() {
 
       {showPrev &&
         notes.map((note) => (
-          <div key={note.id}>
+          <div key={note.id} style={{ textAlign: "left", marginLeft: "20px",
+        marginRight: "20px",}}>
             <p>{note.content}</p>
             <hr />
           </div>
