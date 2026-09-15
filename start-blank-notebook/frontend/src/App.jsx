@@ -9,6 +9,7 @@ function App() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [showIndicators, setShowIndicators] = useState(false);
 
   // load notes from the browser cache of localStorage
   useEffect(() => {
@@ -90,6 +91,14 @@ function App() {
           }
 
           note.savedToPostgres = true;
+
+          setNotes((currentNotes) =>
+            currentNotes.map((currentNote) =>
+              currentNote.id === note.id
+                ? { ...currentNote, savedToPostgres: true }
+                : currentNote
+            )
+          );
         }
       }
       // 3. Update localStorage
@@ -254,6 +263,25 @@ function App() {
     checkLogin();
   }, []);
 
+  const getNoteStatus = (note) => {
+    const isLocal = note.migratedToUserId !== undefined;
+    const isPsql = note.local_id != null || note.savedToPostgres === true;
+
+    if (isLocal && isPsql) {
+      return "🤝";
+    }
+
+    if (isLocal) {
+      return "🖥️";
+    }
+
+    if (isPsql) {
+      return "🧮";
+    }
+
+    return "?";
+  };
+
   return (
     <div>
       <textarea
@@ -328,38 +356,54 @@ function App() {
 
       {message && <p>{message}</p>}
 
-      {showPrev &&
-        notes
-          .filter((note) => {
-            // Hide old PostgreSQL notes that have no local_id
-            if (note.local_id == null && note.migratedToUserId === undefined) {
-              return false;
-            }
+      {showPrev && (
+        <>
+          <button onClick={() => setShowIndicators(!showIndicators)}>
+            {showIndicators ? "Hide Indicators" : "Show Indicators"}
+          </button>
 
-            return true;
-          })
-          .filter(
-            (note, index, allNotes) =>
-              note.local_id == null ||
-              index ===
-              allNotes.findIndex(
-                (otherNote) =>
-                  otherNote.local_id === note.local_id
-              )
-          )
-          .map((note) => (
-            <div
-              key={note.local_id ?? note.id}
-              style={{
-                marginLeft: "20px",
-                marginRight: "20px",
-                textAlign: "left",
-              }}
-            >
-              <p>{note.content}</p>
-              <hr />
-            </div>
-          ))}
+          {notes
+            .filter((note) => {
+              // Hide old PostgreSQL notes that have no local_id
+              if (
+                note.local_id == null &&
+                note.migratedToUserId === undefined
+              ) {
+                return false;
+              }
+
+              return true;
+            })
+            .filter(
+              (note, index, allNotes) =>
+                note.local_id == null ||
+                index ===
+                allNotes.findIndex(
+                  (otherNote) =>
+                    otherNote.local_id === note.local_id
+                )
+            )
+            .map((note) => (
+              <div
+                key={note.local_id ?? note.id}
+                style={{
+                  marginLeft: "20px",
+                  marginRight: "20px",
+                  textAlign: "left",
+                }}
+              >
+                <p>
+                  {showIndicators && (
+                    <small>{getNoteStatus(note)} </small>
+                  )}
+                  {note.content}
+                </p>
+
+                <hr />
+              </div>
+            ))}
+        </>
+      )}
     </div>
   );
 }
