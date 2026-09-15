@@ -330,6 +330,14 @@ function App() {
 
       {showPrev &&
         notes
+          .filter((note) => {
+            // Hide old PostgreSQL notes that have no local_id
+            if (note.local_id == null && note.migratedToUserId === undefined) {
+              return false;
+            }
+
+            return true;
+          })
           .filter(
             (note, index, allNotes) =>
               note.local_id == null ||
