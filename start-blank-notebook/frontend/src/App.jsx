@@ -24,7 +24,7 @@ function App() {
     const newNote = {
       id: Date.now(),
       content: content,
-      savedToPostgres: false,
+      migratedToUserId: null,
     };
 
     const updatedNotes = [newNote, ...notes];
@@ -43,6 +43,7 @@ function App() {
     try {
       // 1. Save current textbox directly to psql
       if (content.trim() !== "") {
+        const localId = Date.now();
         const response = await fetch("http://localhost:3000/api/notes", {
           method: "POST",
           headers: {
@@ -51,12 +52,17 @@ function App() {
           credentials: "include",
           body: JSON.stringify({
             content: content,
+            localId: localId,
           }),
         });
 
         if (!response.ok) {
           throw new Error("Failed to save current note");
         }
+
+        const savedNote = await response.json();
+
+        setNotes((currentNotes) => [savedNote, ...currentNotes]);
 
         setContent("");
       }
@@ -73,6 +79,7 @@ function App() {
             credentials: "include",
             body: JSON.stringify({
               content: note.content,
+              localId: note.id,
             }),
           });
 
@@ -85,10 +92,8 @@ function App() {
           note.savedToPostgres = true;
         }
       }
-      // store updated notes to localstorage
+      // 3. Update localStorage
       localStorage.setItem("notes", JSON.stringify(cachedNotes));
-      // render the updated notes
-      setNotes(cachedNotes);
       setMessage("Unsaved notes saved to PostgreSQL");
       setTimeout(() => {
         setMessage("");
@@ -96,6 +101,40 @@ function App() {
     } catch (error) {
       console.error("Error saving notes to PostgreSQL:", error);
     }
+  };
+
+  const migrateLocalNotes = async (userId) => {
+    const cachedNotes = JSON.parse(localStorage.getItem("notes")) || [];
+
+    for (const note of cachedNotes) {
+      if (note.migratedToUserId === userId) {
+        continue;
+      }
+
+      const response = await fetch("http://localhost:3000/api/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          content: note.content,
+          localId: note.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        console.error("Migration failed:", data);
+        continue;
+      }
+
+      note.migratedToUserId = userId;
+    }
+
+    localStorage.setItem("notes", JSON.stringify(cachedNotes));
+
+    return cachedNotes;
   };
 
   const signup = async () => {
@@ -150,6 +189,8 @@ function App() {
       setIsLoggedIn(true);
       setMessage(`Logged in as ${data.user.username}!`);
 
+      await migrateLocalNotes(data.user.id);
+
       // Load PostgreSQL notes from username
       const notesResponse = await fetch("http://localhost:3000/api/notes", {
         credentials: "include",
@@ -168,6 +209,50 @@ function App() {
       setMessage("Error connecting to server for log in");
     }
   };
+
+  const logout = async () => {
+    try {
+      const response = await fetch("http://localhost:3000/api/logout", {
+        method: "POST",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        throw new Error("Logout failed");
+      }
+
+      setIsLoggedIn(false);
+      setUsername("");
+      setMessage("Logged out");
+    } catch (error) {
+      console.error("Error logging out:", error);
+      setMessage("Error logging out");
+    }
+  };
+
+  useEffect(() => {
+    const checkLogin = async () => {
+      try {
+        const response = await fetch("http://localhost:3000/api/me", {
+          credentials: "include",
+        });
+
+        const data = await response.json();
+
+        if (data.user) {
+          setIsLoggedIn(true);
+          setUsername(data.user.username);
+        } else {
+          setIsLoggedIn(false);
+          setUsername("");
+        }
+      } catch (error) {
+        console.error("Error checking login:", error);
+      }
+    };
+
+    checkLogin();
+  }, []);
 
   return (
     <div>
@@ -189,55 +274,84 @@ function App() {
       </button>
 
       <button onClick={() => setShowLogin(!showLogin)}>
-        {showLogin ? "Hide Logging In" : "Show Logging In"}
+        {showLogin ? "Hide Login" : "Show Login"}
       </button>
 
 
       {showLogin && (
         <>
-          <h2>Account</h2>
+          {isLoggedIn ? (
+            <>
+              <p>Logged in as {username}</p>
+              <p><button onClick={logout}>Log Out</button></p>
+            </>
+          ) : (
+            <p>Not logged in</p>
+          )}
 
-          <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-          />
+          {!isLoggedIn && (
+            <>
+              <h2>Account</h2>
 
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
+              <input
+                type="text"
+                placeholder="Username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
 
-          <br />
+              <input
+                type="password"
+                placeholder="Password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
 
-          <button onClick={signup}>
-            Sign Up
-          </button>
+              <br />
 
-          <button onClick={login}>
-            Log In
-          </button>
-          <br />
+              <button onClick={signup}>
+                Sign Up
+              </button>
+
+              <button onClick={login}>
+                Log In
+              </button>
+              <br />
+            </>)
+          }
         </>
       )}
 
       <button onClick={() => setShowPrev(!showPrev)}>
-        {showPrev ? "Hide Previous Entries" : "Show Previous Entries"}
+        {showPrev ? "Hide Prev Notes" : "Show Prev Notes"}
       </button>
 
       {message && <p>{message}</p>}
 
       {showPrev &&
-        notes.map((note) => (
-          <div key={note.id} style={{ textAlign: "left", marginLeft: "20px",
-        marginRight: "20px",}}>
-            <p>{note.content}</p>
-            <hr />
-          </div>
-        ))}
+        notes
+          .filter(
+            (note, index, allNotes) =>
+              note.local_id == null ||
+              index ===
+              allNotes.findIndex(
+                (otherNote) =>
+                  otherNote.local_id === note.local_id
+              )
+          )
+          .map((note) => (
+            <div
+              key={note.local_id ?? note.id}
+              style={{
+                marginLeft: "20px",
+                marginRight: "20px",
+                textAlign: "left",
+              }}
+            >
+              <p>{note.content}</p>
+              <hr />
+            </div>
+          ))}
     </div>
   );
 }

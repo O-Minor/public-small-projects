@@ -55,7 +55,7 @@ app.get("/api/notes", async (req, res) => {
 // post a note
 app.post("/api/notes", async (req, res) => {
     try {
-        const { content } = req.body;
+        const { content, localId } = req.body;
         const userId = req.session.userId;
 
         if (!userId) {
@@ -63,8 +63,8 @@ app.post("/api/notes", async (req, res) => {
         }
 
         const result = await pool.query(
-            "INSERT INTO notes (content, user_id) VALUES ($1, $2) RETURNING *",
-            [content, userId]
+            "INSERT INTO notes (content, user_id, local_id) VALUES ($1, $2, $3) RETURNING *",
+            [content, userId, localId]
         );
 
         res.status(201).json(result.rows[0]);
