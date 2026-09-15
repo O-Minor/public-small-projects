@@ -4,7 +4,11 @@ function App() {
   const [notes, setNotes] = useState([]);
   const [content, setContent] = useState("");
   const [showPrev, setShowPrev] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const [message, setMessage] = useState("");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   // load notes from the browser cache of localStorage
   useEffect(() => {
@@ -63,7 +67,64 @@ function App() {
           console.error("Error saving notes to PostgreSQL:", error);
       }
   };
+
+  const signup = async () => {
+    try {
+      const response = await fetch("http://localhost:3000/api/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          username: username,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.error);
+        return;
+      }
+
+      setMessage("Account created!");
+    } catch (error) {
+      console.error(error);
+      setMessage("Error connecting to server for sign up");
+    }
+  };
   
+  const login = async () => {
+    try {
+      const response = await fetch("http://localhost:3000/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          username: username,
+          password: password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setMessage(data.error);
+        return;
+      }
+
+      setIsLoggedIn(true);
+      setMessage("Logged in!");
+    } catch (error) {
+      console.error(error);
+      setMessage("Error connecting to server for log in");
+    }
+  };
+
   return (
     <div>
       <textarea
@@ -82,6 +143,42 @@ function App() {
       <button onClick={saveToPostgres}>
         PostgreSQL Save
       </button>
+
+      <button onClick={() => setShowLogin(!showLogin)}>
+        {showLogin ? "Hide Logging In" : "Show Logging In"} 
+      </button>
+
+      
+      {showLogin && (
+        <>
+        <h2>Account</h2>
+
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(event) => setUsername(event.target.value)}
+        />
+
+        <input
+          type="password"
+          placeholder="Password"
+          value={password}
+          onChange={(event) => setPassword(event.target.value)}
+        />
+
+        <br />
+
+        <button onClick={signup}>
+          Sign Up
+        </button>
+
+        <button onClick={login}>
+          Log In
+        </button>
+        <br />
+        </>
+      )}
 
       <button onClick={() => setShowPrev(!showPrev)}>
         {showPrev ? "Hide Previous Entries" : "Show Previous Entries"} 
