@@ -34,38 +34,66 @@ function App() {
     setNotes(updatedNotes);
     setContent("");
 
-    
+
   };
 
   const saveToPostgres = async () => {
-      const cachedNotes = JSON.parse(localStorage.getItem("notes")) || [];
+    const cachedNotes = JSON.parse(localStorage.getItem("notes")) || [];
 
-      try {
-          for (const note of cachedNotes) {
-            if (!note.savedToPostgres) {
-              await fetch("http://localhost:3000/api/notes", {
-                  method: "POST",
-                  headers: {
-                      "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                      content: note.content,
-                  }),
-              });
-              note.savedToPostgres = true;
-            }
-          }
-          // store updated notes to localstorage
-          localStorage.setItem("notes", JSON.stringify(cachedNotes));
-          // render the updated notes
-          setNotes(cachedNotes);
-          setMessage("Unsaved notes saved to PostgreSQL");
-          setTimeout(() => {
-            setMessage("");
-          }, 3000);
-      } catch (error) {
-          console.error("Error saving notes to PostgreSQL:", error);
+    try {
+      // 1. Save current textbox directly to psql
+      if (content.trim() !== "") {
+        const response = await fetch("http://localhost:3000/api/notes", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+          body: JSON.stringify({
+            content: content,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to save current note");
+        }
+
+        setContent("");
       }
+
+      // 2. Save unsent localStorage notes to psql
+      for (const note of cachedNotes) {
+        if (!note.savedToPostgres) {
+          await fetch("http://localhost:3000/api/notes", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({
+              content: note.content,
+            }),
+          });
+
+          if (!response.ok) {
+            const data = await response.json();
+            console.error("Save failed:", data);
+            return;
+          }
+          note.savedToPostgres = true;
+        }
+      }
+      // store updated notes to localstorage
+      localStorage.setItem("notes", JSON.stringify(cachedNotes));
+      // render the updated notes
+      setNotes(cachedNotes);
+      setMessage("Unsaved notes saved to PostgreSQL");
+      setTimeout(() => {
+        setMessage("");
+      }, 3000);
+    } catch (error) {
+      console.error("Error saving notes to PostgreSQL:", error);
+    }
   };
 
   const signup = async () => {
@@ -95,7 +123,7 @@ function App() {
       setMessage("Error connecting to server for sign up");
     }
   };
-  
+
   const login = async () => {
     try {
       const response = await fetch("http://localhost:3000/api/login", {
@@ -134,54 +162,54 @@ function App() {
         rows="10"
         cols="50"
       />
-      <br/>
+      <br />
 
       <button onClick={saveNote}>
         Local Save
       </button>
 
       <button onClick={saveToPostgres}>
-        PostgreSQL Save
+        PSQL Save
       </button>
 
       <button onClick={() => setShowLogin(!showLogin)}>
-        {showLogin ? "Hide Logging In" : "Show Logging In"} 
+        {showLogin ? "Hide Logging In" : "Show Logging In"}
       </button>
 
-      
+
       {showLogin && (
         <>
-        <h2>Account</h2>
+          <h2>Account</h2>
 
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(event) => setUsername(event.target.value)}
-        />
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+          />
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(event) => setPassword(event.target.value)}
-        />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
 
-        <br />
+          <br />
 
-        <button onClick={signup}>
-          Sign Up
-        </button>
+          <button onClick={signup}>
+            Sign Up
+          </button>
 
-        <button onClick={login}>
-          Log In
-        </button>
-        <br />
+          <button onClick={login}>
+            Log In
+          </button>
+          <br />
         </>
       )}
 
       <button onClick={() => setShowPrev(!showPrev)}>
-        {showPrev ? "Hide Previous Entries" : "Show Previous Entries"} 
+        {showPrev ? "Hide Previous Entries" : "Show Previous Entries"}
       </button>
 
       {message && <p>{message}</p>}
@@ -192,7 +220,7 @@ function App() {
             <p>{note.content}</p>
             <hr />
           </div>
-      ))}
+        ))}
     </div>
   );
 }

@@ -36,8 +36,13 @@ const pool = new Pool({
 
 app.get("/api/notes", async (req, res) => {
     try {
+        const userId = req.session.userId;
+        if (!userId) {
+            return res.status(401).json({ error: "Not logged in" });
+        }
         const result = await pool.query(
-            "SELECT * FROM notes ORDER BY created_at DESC"
+            "SELECT * FROM notes WHERE user_id = $1 ORDER BY created_at DESC",
+            [userId]
         );
 
         res.json(result.rows);
@@ -51,10 +56,15 @@ app.get("/api/notes", async (req, res) => {
 app.post("/api/notes", async (req, res) => {
     try {
         const { content } = req.body;
+        const userId = req.session.userId;
+
+        if (!userId) {
+            return res.status(401).json({ error: "Not logged in" });
+        }
 
         const result = await pool.query(
-            "INSERT INTO notes (content) VALUES ($1) RETURNING *",
-            [content]
+            "INSERT INTO notes (content, user_id) VALUES ($1, $2) RETURNING *",
+            [content, userId]
         );
 
         res.status(201).json(result.rows[0]);
